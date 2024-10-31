@@ -49,3 +49,17 @@
     (map-get? nft-loan-index { nft-id: nft-id, collateral-contract: collateral-contract })
 )
 
+(define-read-only (calculate-repayment-amount (loan-id uint))
+    (match (get-loan loan-id)
+        loan (let (
+                (principal-amount (get loan-amount loan))
+                (rate (get interest-rate loan))
+                (start-block (unwrap! (get start-block loan) err-loan-not-active))
+                (blocks-elapsed (- block-height start-block))
+            )
+            (ok (+ principal-amount 
+                  (/ (* principal-amount rate blocks-elapsed) u10000))))
+        err-invalid-loan
+    )
+)
+
