@@ -1,6 +1,13 @@
 ;; NFT Collateralized Loan Contract
 ;; Allows users to take loans using their NFTs as collateral
 
+(define-trait nft-trait
+    (
+        (transfer (uint principal principal) (response bool uint))
+        (get-owner (uint) (response (optional principal) uint))
+    )
+)
+
 
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
@@ -31,6 +38,12 @@
     }
 )
 
+(define-map nft-locks
+    { nft-id: uint, nft-contract: principal }
+    { loan-id: uint }
+)
+
+
 (define-map nft-loan-index 
     { nft-id: uint, collateral-contract: principal }
     { loan-id: uint }
@@ -49,6 +62,10 @@
     (map-get? nft-loan-index { nft-id: nft-id, collateral-contract: collateral-contract })
 )
 
+(define-read-only (get-nft-lock (nft-id uint) (nft-contract principal))
+    (map-get? nft-locks { nft-id: nft-id, nft-contract: nft-contract })
+)
+
 (define-read-only (calculate-repayment-amount (loan-id uint))
     (match (get-loan loan-id)
         loan (let (
@@ -63,3 +80,57 @@
     )
 )
 
+;; Public functions
+(define-public (create-loan-request 
+    (nft-contract <nft-trait>) 
+    (nft-id uint)
+    (loan-amount uint)
+    (interest-rate uint)
+    (duration uint))
+    (let (
+        (loan-id (var-get loan-nonce))
+        (nft-contract-principal (contract-of nft-contract))
+    )
+        ;; Check if NFT is owned by sender
+        (match (contract-call? nft-contract get-owner nft-id)
+            success 
+                (if (is-eq (some tx-sender) success)
+                    (begin
+                        ;; Check if NFT is not already locked
+                        (asserts! (is-none (get-nft-lock nft-id nft-contract-principal)) err-nft-locked)
+                        
+                        ;; Transfer NFT to contract
+                        (try! (contract-call? nft-contract transfer 
+                            nft-id 
+                            tx-sender 
+                            (as-contract tx-sender)))
+                        
+                        ;; Create loan
+                        (map-set loans
+                            { loan-id: loan-id }
+                            {
+                                borrower: tx-sender,
+                                lender: none,
+                                nft-id: nft-id,
+                                nft-contract: nft-contract-principal,
+                                loan-amount: loan-amount,
+                                interest-rate: interest-rate,
+                                duration: duration,
+                                start-block: none,
+                                end-block: none,
+                                status: "OPEN"
+                            })
+                        
+                        ;; Lock NFT
+                        (map-set nft-locks
+                            { nft-id: nft-id, nft-contract: nft-contract-principal }
+                            { loan-id: loan-id })
+                        
+                        ;; Increment nonce
+                        (var-set loan-nonce (+ loan-id u1))
+                        (ok loan-id)
+                    )
+                    err-not-nft-owner)
+            error (err error))
+    )
+)
