@@ -9,3 +9,19 @@
 (define-constant err-loan-active (err u104))
 (define-constant err-not-borrower (err u105))
 (define-constant err-loan-expired (err u106))
+
+;; Data Maps
+(define-map loans
+    { loan-id: uint }
+    {
+        borrower: principal,
+        lender: (optional principal),
+        nft-id: uint,
+        collateral-contract: principal,
+        loan-amount: uint,
+        interest-rate: uint,
+        duration: uint,
+        start-time: (optional uint),
+        status: (string-ascii 20)
+    }
+)
