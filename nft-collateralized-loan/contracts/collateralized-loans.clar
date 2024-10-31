@@ -134,3 +134,27 @@
             error (err error))
     )
 )
+
+(define-public (fund-loan (loan-id uint))
+    (let (
+        (loan (unwrap! (get-loan loan-id) err-invalid-loan))
+        (current-block block-height)
+    )
+        ;; Verify loan status
+        (asserts! (is-eq (get status loan) "OPEN") err-loan-already-active)
+        
+        ;; Transfer STX from lender to borrower
+        (try! (stx-transfer? (get loan-amount loan) tx-sender (get borrower loan)))
+        
+        ;; Update loan status
+        (map-set loans
+            { loan-id: loan-id }
+            (merge loan {
+                lender: (some tx-sender),
+                start-block: (some current-block),
+                end-block: (some (+ current-block (get duration loan))),
+                status: "ACTIVE"
+            }))
+        (ok true)
+    )
+)
