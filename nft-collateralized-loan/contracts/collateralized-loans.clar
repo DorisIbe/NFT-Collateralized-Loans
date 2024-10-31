@@ -158,3 +158,116 @@
         (ok true)
     )
 )
+
+;; Repay loan function
+(define-public (repay-loan (loan-id uint))
+  (let
+    (
+      (loan (unwrap! (get-loan loan-id) err-invalid-loan))
+      (repayment-amount (unwrap! (calculate-repayment-amount loan-id) err-invalid-loan))
+    )
+    ;; Verify loan status and borrower
+    (asserts! (is-eq (get status loan) "ACTIVE") err-loan-not-active)
+    (asserts! (is-eq tx-sender (get borrower loan)) err-unauthorized)
+    (asserts! (<= block-height (unwrap! (get end-block loan) err-invalid-loan)) err-loan-expired)
+
+    ;; Transfer repayment to lender
+    (try! (stx-transfer? repayment-amount tx-sender (unwrap! (get lender loan) err-invalid-loan)))
+
+    ;; Return NFT - Now with fully qualified contract name
+    (as-contract 
+      (try! 
+        (contract-call? 
+          .nft-marketplace  ;; Replace with actual contract name like .wrapped-bitcoin or .punk-transfer
+          transfer 
+          (get nft-id loan) 
+          contract-address
+          (get borrower loan)
+        )
+      )
+    )
+
+    ;; Clear loan data
+    (map-delete loans loan-id)
+    (map-delete nft-locks 
+      {
+        nft-id: (get nft-id loan),
+        nft-contract: (get nft-contract loan)
+      }
+    )
+    (ok true)
+  )
+)
+
+;; Claim defaulted NFT function
+(define-public (claim-defaulted-nft (loan-id uint))
+  (let
+    (
+      (loan (unwrap! (get-loan loan-id) err-invalid-loan))
+    )
+    ;; Verify loan status and caller
+    (asserts! (is-eq (get status loan) "ACTIVE") err-loan-not-active)
+    (asserts! (is-eq tx-sender (unwrap! (get lender loan) err-invalid-loan)) err-unauthorized)
+    (asserts! (>= block-height (unwrap! (get end-block loan) err-invalid-loan)) err-loan-not-expired)
+
+    ;; Transfer NFT to lender - Now with fully qualified contract name
+    (as-contract 
+      (try! 
+        (contract-call? 
+          .nft-marketplace  ;; Replace with actual contract name
+          transfer 
+          (get nft-id loan) 
+          contract-address
+          (get lender loan)
+        )
+      )
+    )
+
+    ;; Update loan status
+    (map-set loans loan-id (merge loan { status: "DEFAULTED" }))
+    
+    ;; Clear NFT lock
+    (map-delete nft-locks 
+      {
+        nft-id: (get nft-id loan),
+        nft-contract: (get nft-contract loan)
+      }
+    )
+    (ok true)
+  )
+)
+
+;; Cancel loan request function
+(define-public (cancel-loan-request (loan-id uint))
+  (let
+    (
+      (loan (unwrap! (get-loan loan-id) err-invalid-loan))
+    )
+    ;; Verify loan status and caller
+    (asserts! (is-eq (get status loan) "OPEN") err-loan-already-active)
+    (asserts! (is-eq tx-sender (get borrower loan)) err-unauthorized)
+
+    ;; Return NFT to borrower - Now with fully qualified contract name
+    (as-contract 
+      (try! 
+        (contract-call? 
+          .nft-marketplace  ;; Replace with actual contract name
+          transfer 
+          (get nft-id loan) 
+          contract-address
+          (get borrower loan)
+        )
+      )
+    )
+
+    ;; Clear loan data
+    (map-delete loans loan-id)
+    (map-delete nft-locks 
+      {
+        nft-id: (get nft-id loan),
+        nft-contract: (get nft-contract loan)
+      }
+    )
+    (ok true)
+  )
+)
