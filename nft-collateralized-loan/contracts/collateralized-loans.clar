@@ -21,12 +21,13 @@
         borrower: principal,
         lender: (optional principal),
         nft-id: uint,
-        collateral-contract: principal,
+        nft-contract: principal,
         loan-amount: uint,
-        interest-rate: uint,
-        duration: uint,
-        start-time: (optional uint),
-        status: (string-ascii 20)
+        interest-rate: uint,  
+        duration: uint,       
+        start-block: (optional uint),
+        end-block: (optional uint),
+        status: (string-ascii 10)  
     }
 )
 
