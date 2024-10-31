@@ -25,3 +25,10 @@
         status: (string-ascii 20)
     }
 )
+
+(define-map nft-loan-index 
+    { nft-id: uint, collateral-contract: principal }
+    { loan-id: uint }
+)
+
+(define-data-var loan-nonce uint u0)
