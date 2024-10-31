@@ -32,3 +32,13 @@
 )
 
 (define-data-var loan-nonce uint u0)
+
+
+;; Read-only functions
+(define-read-only (get-loan (loan-id uint))
+    (map-get? loans { loan-id: loan-id })
+)
+
+(define-read-only (get-loan-by-nft (nft-id uint) (collateral-contract principal))
+    (map-get? nft-loan-index { nft-id: nft-id, collateral-contract: collateral-contract })
+)
